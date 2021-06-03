@@ -19,6 +19,7 @@ PRIMARY_PAGE = "https://coin.zerodha.com/funds"
 options = Options()
 options.headless = True
 
+
 def get_primary_page(link):
     driver.get(link)
     time.sleep(3)
@@ -73,18 +74,40 @@ def summary(link):
 def format_df(df):
     if df.empty:
         return pd.DataFrame()
-    df["curr_price_val"] = df["curr_price"].apply(lambda x: x.split(" ")[1]).astype(float)
-    df["growth"] = df["curr_price"].apply(lambda x: x.split(" ")[2][1:-2]).astype(float)
+    df["curr_price_val"] = df["curr_price"].apply(lambda x: x.split(" ")[1].replace(",", "")).astype(float)
+    df["growth"] = df["curr_price"].apply(lambda x: x.split(" ")[2].replace(",", "")[1:-2]).astype(float)
     df["launch_date"] = df["Launch date"].apply(lambda x: datetime.strptime(x, '%d-%m-%Y'))
-    df["1 year(%)"] = df["1 year:"].apply(lambda x: float(x[:-1]) if isinstance(x, str) else np.NAN)
-    df["3 year(%)"] = df["3 years:"].apply(lambda x: float(x[:-1]) if isinstance(x, str) else np.NAN)
-    df["5 year(%)"] = df["5 years:"].apply(lambda x: float(x[:-1]) if isinstance(x, str) else np.NAN)
-    df["exit_load(%)"] = df["Exit load"].apply(lambda x: float(x[:-1]) if isinstance(x, str) else np.NAN)
+    df["1 year(%)"] = df["1 year:"].apply(lambda x: float(x[:-1].replace(",", "")) if isinstance(x, str) else np.NAN)
+    df["3 year(%)"] = df["3 years:"].apply(lambda x: float(x[:-1].replace(",", "")) if isinstance(x, str) else np.NAN)
+    df["5 year(%)"] = df["5 years:"].apply(lambda x: float(x[:-1].replace(",", "")) if isinstance(x, str) else np.NAN)
+    df["exit_load(%)"] = df["Exit load"].apply(lambda x: float(x[:-1].replace(",", "")) if isinstance(x, str) else np.NAN)
     df["min_investment"] = df["Minimum investment"].apply(lambda x: x.split(" ")[1].replace(",", "")).astype(float)
     df["document_link"] = df["doc_link"]
     df = df.drop(columns=['curr_price', '1 year:', '3 years:', '5 years:', 'Launch date', 'Exit load',
                           'Minimum investment', 'doc_link'])
     return df
+
+
+def dict_formatter(temp):
+    temp_ = {}
+    try:
+        curr_price_list = temp["curr_price"].split(" ")
+        temp_["mf_name"] = temp["mf_name"]
+        temp_["curr_price"] = float(curr_price_list[1].replace(",", ""))
+        temp_["growth(%)"] = float(curr_price_list[2].replace(",", "")[1:-2])
+        temp_["1 year(%)"] = float(temp["1 year:"][:-1].replace(",", "")) if isinstance(temp["1 year:"], str) else np.NAN
+        temp_["3 year(%)"] = float(temp["3 years:"][:-1].replace(",", "")) if isinstance(temp["3 years:"], str) else np.NAN
+        temp_["5 year(%)"] = float(temp["5 years:"][:-1].replace(",", "")) if isinstance(temp["5 years:"], str) else np.NAN
+        temp_["launch_date"] = datetime.strptime(temp["Launch date"], '%d-%m-%Y')
+        temp_["exit_load(%)"] = float(temp["Exit load"][:-1].replace(",", "")) if isinstance(temp["Exit load"], str) else np.NAN
+        temp_["min_investment"] = float(temp["Minimum investment"].split(" ")[1].replace(",", ""))
+        temp_["Last dividend payout"] = temp["Last dividend payout"]
+        temp_["document_link"] = temp["doc_link"]
+        temp_["link"] = temp["link"]
+        del temp
+    except Exception as e:
+        print(e)
+    return temp_
 
 
 driver = webdriver.Chrome(options=options, executable_path="chromedriver.exe")
@@ -98,7 +121,7 @@ else:
     outfile.close()
 driver.quit()
 
-batch = hrefs_arr[:30]
+batch = hrefs_arr[:5]
 
 df_dict = []
 MISSED = []
@@ -115,9 +138,14 @@ for link in batch:
     if link not in bloom:
         try:
             result = summary(link)
-            print(link, ": DONE!!!")
-            df_dict.append(result)
-            bloom.add(link)
+            result = dict_formatter(result)
+            if result:
+                df_dict.append(result)
+                bloom.add(link)
+                print(link, ": DONE!!!")
+            else:
+                print(link, ": MISSED in Formatting!!!")
+                MISSED.append(link)
         except Exception as e:
             print(link, ": MISSED!!!", e)
             MISSED.append(link)
@@ -131,7 +159,6 @@ if os.path.isfile("output.csv"):
 else:
     df = pd.DataFrame()
 
-temp_df = format_df(pd.DataFrame(df_dict))
+temp_df = pd.DataFrame(df_dict)
 df = df.append(temp_df)
 df.to_csv("output.csv", index=False)
-

@@ -14,6 +14,7 @@ import pickle
 import os
 from bloom_filter import BloomFilter
 import numpy as np
+from selenium.webdriver.support.ui import Select
 
 PRIMARY_PAGE = "https://coin.zerodha.com/funds"
 options = Options()
@@ -49,11 +50,16 @@ def summary(link):
     temp["curr_price"] = curr_price
 
     # get CAGR
-    cagr = driver.find_elements_by_xpath("//div[contains(@class, 'units-row mobile-center returns-each')]")
-    for tag in cagr:
-        year = tag.find_elements_by_tag_name('h6')[0].get_attribute('innerHTML')
-        returns = tag.find_elements_by_tag_name('div')[0].text
-        temp[year] = returns
+    # cagr = driver.find_elements_by_xpath("//div[contains(@class, 'units-row mobile-center returns-each')]")
+    # for tag in cagr:
+    #     year = tag.find_elements_by_tag_name('h6')[0].get_attribute('innerHTML')
+    #     returns = tag.find_elements_by_tag_name('div')[0].text
+    #     temp[year] = returns
+    select = Select(driver.find_element_by_xpath("//select[contains(@ng-model, 'cagr_select')]"))
+    options_dropdown = select.options
+    for index, year in zip(range(len(options_dropdown)), ["1 year(%)", "3 year(%)", "5 year(%)"]):
+        select.select_by_index(index)
+        temp[year] = driver.find_element_by_xpath("//span[contains(@class, 'returns-value')]").text
 
     # Other Details
     min_inv = driver.find_elements_by_xpath("//li[contains(@class, 'unit-20 fund-bottom-section')]")[:4]
@@ -90,23 +96,23 @@ def format_df(df):
 
 def dict_formatter(temp):
     temp_ = {}
-    try:
-        curr_price_list = temp["curr_price"].split(" ")
-        temp_["mf_name"] = temp["mf_name"]
-        temp_["curr_price"] = float(curr_price_list[1].replace(",", ""))
-        temp_["growth(%)"] = float(curr_price_list[2].replace(",", "")[1:-2])
-        temp_["1 year(%)"] = float(temp["1 year:"][:-1].replace(",", "")) if isinstance(temp["1 year:"], str) else np.NAN
-        temp_["3 year(%)"] = float(temp["3 years:"][:-1].replace(",", "")) if isinstance(temp["3 years:"], str) else np.NAN
-        temp_["5 year(%)"] = float(temp["5 years:"][:-1].replace(",", "")) if isinstance(temp["5 years:"], str) else np.NAN
-        temp_["launch_date"] = datetime.strptime(temp["Launch date"], '%d-%m-%Y')
-        temp_["exit_load(%)"] = float(temp["Exit load"][:-1].replace(",", "")) if isinstance(temp["Exit load"], str) else np.NAN
-        temp_["min_investment"] = float(temp["Minimum investment"].split(" ")[1].replace(",", ""))
-        temp_["Last dividend payout"] = temp["Last dividend payout"]
-        temp_["document_link"] = temp["doc_link"]
-        temp_["link"] = temp["link"]
-        del temp
-    except Exception as e:
-        print(e)
+    # try:
+    curr_price_list = temp["curr_price"].split(" ")
+    temp_["mf_name"] = temp["mf_name"]
+    temp_["curr_price"] = float(curr_price_list[1].replace(",", ""))
+    temp_["growth(%)"] = float(curr_price_list[2].replace(",", "")[1:-2])
+    temp_["1 year(%)"] = float(temp["1 year(%)"][:-1].replace(",", "")) if isinstance(temp["1 year(%)"], str) else np.NAN
+    temp_["3 year(%)"] = float(temp["3 year(%)"][:-1].replace(",", "")) if isinstance(temp["3 year(%)"], str) else np.NAN
+    temp_["5 year(%)"] = float(temp["5 year(%)"][:-1].replace(",", "")) if isinstance(temp["5 year(%)"], str) else np.NAN
+    temp_["launch_date"] = datetime.strptime(temp["Launch date"], '%d-%m-%Y')
+    temp_["exit_load(%)"] = float(temp["Exit load"][:-1].replace(",", "")) if isinstance(temp["Exit load"], str) and temp["Exit load"] != "None" else np.NAN
+    temp_["min_investment"] = float(temp["Minimum investment"].split(" ")[1].replace(",", ""))
+    temp_["Last dividend payout"] = temp["Last dividend payout"]
+    temp_["document_link"] = temp["doc_link"]
+    temp_["link"] = temp["link"]
+    del temp
+    # except Exception as e:
+    #     print(e)
     return temp_
 
 
@@ -121,7 +127,7 @@ else:
     outfile.close()
 driver.quit()
 
-batch = hrefs_arr[:5]
+batch = hrefs_arr[9:20]
 
 df_dict = []
 MISSED = []
@@ -149,6 +155,8 @@ for link in batch:
         except Exception as e:
             print(link, ": MISSED!!!", e)
             MISSED.append(link)
+    else:
+        print("Bloom Hit!!!")
 
 outfile = open("link_bloom.pkl", 'wb')
 pickle.dump(bloom, outfile)

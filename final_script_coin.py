@@ -1,3 +1,4 @@
+# selenium==3.141.0
 # prepare driver
 # get all MF page links
 # iterate over each page to get details and add it in the list of dict

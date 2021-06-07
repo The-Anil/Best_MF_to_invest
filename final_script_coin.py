@@ -15,6 +15,7 @@ import os
 from bloom_filter import BloomFilter
 import numpy as np
 from selenium.webdriver.support.ui import Select
+import sys
 
 PRIMARY_PAGE = "https://coin.zerodha.com/funds"
 options = Options()
@@ -127,7 +128,7 @@ else:
     outfile.close()
 driver.quit()
 
-batch = hrefs_arr[9:20]
+batch = hrefs_arr[:50]
 
 df_dict = []
 MISSED = []
